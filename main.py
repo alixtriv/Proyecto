@@ -17,7 +17,7 @@ from nltk.corpus import wordnet #nos ayuda a encontrar sinonimos de palabra
 
 # indicamos la ruta donde NLTK buscará los datos descargados en nuestro computador 
 nltk.data.path.append('C:\Users\Usuario\AppData\Roaming\nltk_data')
-#nltk.download('punkt') para descargar la carpeta de ntlk-data
+nltk.download('punkt') #para descargar la carpeta de ntlk-data
 #descargamos las herramientas necesarias de NLTK para el analisi de palabras
 
 nltk.download('punit') #paquete para dividir frases en palabras
@@ -44,3 +44,56 @@ movies_list =load_movies()
 def get_synonyms(word):
     # Usamos wirdnet para obtener distintas palabras que significan lo mismo.
     return{lema.name().lower() for Syn in wordnet.synsets(word) for lema in Syn.lemas()}
+
+#creamos la aplicación FastAPI, que sera el motor de nuestra API
+# Esto inicializa la API con un nombre y una version 
+app = FastAPI(title="Mi Aplicación de Peliculas", version="1.0.0")
+
+#Ruta de inicio: cuando alguien entra a la API sin especificar nada, vera un mensaje de bienvenido
+
+@app.get('/',tags=['Home'])
+def home():
+    return HTMLResponse('<h1>Bienvenido a la API de Peliculas</h1>')
+#obteniendo la lista de peliculas
+#creamos una ruta para obtener todas las peliculas
+
+#Ruta para obtener todas las peliculas disponibles
+
+@app.get('/movies', tags=['Movies'])
+def get_movies():
+    # si hay peliculas las enviamos, si no, mostramos un error
+    return movies_list or HTTPException(status_code=500, detail="No hay datos de peliculas disponibles")
+    
+# Ruta para obtener una pelicula especifica segun su id
+
+@app.get('/movies/{id}', tag= ['Movies'])
+def get_movie(id: str):
+    #Buscamos en la lista de peliculas la que tenga el mismo ID
+    return next((m for m in movies_list if m ['id'] == id), {"detalle": "pelicula no encontrada"})
+
+#Ruta del chatbot que responde con peliculas segun las palabras claves de la categoria
+
+@app.get('/chatbot', tags=['chatbot'])
+def chatbot(query: str):
+    # Dividimos la consulta en palabras clave, para entender mejor la intención del usuario
+    query_words = word_tokenize(query.lower())
+    
+    #Buscamos sinonimos de las palabras clave para ampliar la busqueda
+    synonyms ={word for q in query_words for word in get_synonyms(q)} | set(query_words)
+    
+    #Filtramos la lista de peliculas buscando coincidencias en la categoria
+    results = [m for m in movies_list if any (s in m ['category'].lower() for s in synonyms)]
+    
+    # Si encontramos peliculas, enviamos la lista; si no, mostramos un mensaje de que no se encontro coincidencias
+
+    return JSONResponse(content={
+        "respuesta":"Aqui tienes algunas peliculas relacionadas." if results else "No encontré peliculas en esa categoria.",
+        "peliculas": results
+    })
+
+# Ruta para buscar peliculas por categoria especifica
+
+@app.get('/movies', tags=['Movies'])
+def get_movies_by_category(category: str):
+    #Filtramos la lista de peliculas según la categoria ingresada
+    return [m for m in movies_list if category.lower() in m['categoy'].lower()uvicorn main:app --reload]
